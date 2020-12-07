@@ -1,0 +1,259 @@
+---
+title: "Modeling, Inference, Prediction"
+author: "Sarah Bybee"
+date: "2020-12-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+hook_output = knit_hooks$get('output')
+knit_hooks$set(output = function(x, options) {
+  # this hook is used only when the linewidth option is not NULL
+  if (!is.null(n <- options$linewidth)) {
+    x = knitr:::split_lines(x)
+    # any lines wider than n should be wrapped
+    if (any(nchar(x) > n)) x = strwrap(x, width = n)
+    x = paste(x, collapse = '\n')
+  }
+  hook_output(x, options)
+})
+
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE,fig.align="center",warning=FALSE,message=FALSE,fig.width=8, fig.height=5, linewidth=60)
+options(tibble.width = 100,width = 100)
+library(tidyverse)
+library(sandwich)
+library(lmtest)
+library(rstatix)
+library(lmtest)
+library(plotROC)
+library(glmnet)
+
+class_diag<-function(probs,truth){
+  tab<-table(factor(probs>.5,levels=c("FALSE","TRUE")),truth)
+  acc=sum(diag(tab))/sum(tab)
+  sens=tab[2,2]/colSums(tab)[2]
+  spec=tab[1,1]/colSums(tab)[1]
+  ppv=tab[2,2]/rowSums(tab)[2]
+  f1=2*(sens*ppv)/(sens+ppv)
+
+  if(is.numeric(truth)==FALSE & is.logical(truth)==FALSE){
+    truth<-as.numeric(truth)-1}
+  
+  #CALCULATE EXACT AUC
+  ord<-order(probs, decreasing=TRUE)
+  probs <- probs[ord]; truth <- truth[ord]
+  
+  TPR=cumsum(truth)/max(1,sum(truth)) 
+  FPR=cumsum(!truth)/max(1,sum(!truth))
+  
+  dup<-c(probs[-1]>=probs[-length(probs)], FALSE)
+  TPR<-c(0,TPR[!dup],1); FPR<-c(0,FPR[!dup],1)
+  
+  n <- length(TPR)
+  auc<- sum( ((TPR[-1]+TPR[-n])/2) * (FPR[-1]-FPR[-n]) )
+
+  data.frame(acc,sens,spec,ppv,f1,auc)
+}
+```
+
+##Introduction
+
+I downloaded my goodreads library information to use as my dataset. There are 421 observations, each representing a different book.
+
+```{R}
+library(readr)
+goodreadsdata <- read_csv("goodreadsdata.csv", 
+    col_types = cols(avgrating = col_number(), 
+        myrating = col_number(), pages = col_number(), 
+        pubyear = col_number()))
+goodreads <- goodreadsdata
+glimpse(goodreads)
+```
+The "title" variable contains book titles for each book I have added to my goodreads library. The "myrating" variable is the star rating I gave the book on a scale of 0-5. The "avgrating" variable lists the average rating for the book based on all community ratings. The "binding" variable lists whether a book is a paperback, hardcover, ebook, or audiobook. The "pages" variable is a count of the number of pages in the book. The "pubyear" variable lists the year the book was initially published. The "shelf" variable states whether I have read, want to read, or am currently reading the book.
+
+##MANOVA
+
+```{R}
+group <- goodreads$binding
+dvs <- goodreads %>% select(avgrating, pages, pubyear)
+
+sapply(split(dvs, group), mshapiro_test)
+
+man <- manova(cbind(avgrating, pages, pubyear)~binding, data = goodreads)
+summary(man)
+
+summary.aov(man)
+
+pairwise.t.test(goodreads$pages, goodreads$binding, p.adj="none")
+
+pairwise.t.test(goodreads$pubyear, goodreads$binding, p.adj="none")
+
+1 - .95^16
+
+.05/(1+3+6+6)
+```
+A one-way MANOVA was conducted to determine the effect of book binding (paperback, hardcover, ebook, audiobook) on the three dependent variables average rating, page number, and publication year. The numeric variable quantifying my rating was not included because for all books I have not read the rating is zero and therefore largely dependent on whether or not I have read the book.
+
+After testing for multivariate normality for each group, we reject the null hypothesis that the assumptions were met since each p value is less than 0.0001. Therefore, the assumptions were violated. 
+
+The MANOVA showed significant differences among book bindings for at least one of the dependent variables (Pillai trace = 0.15, pseudo F(91251) = 7.13, p < 0.0001).
+
+The univariate ANOVAS were significant for the dependent variables page number and publication year (F(3,147) = 10.96, p < 0.0001 and F(3,147) = 8.76, p < 0.0001).
+
+Post hoc pairwise t tests were done to determine which bindings differed in number of pages and publication year. For number of pages there is a significant difference between audiobooks and hardcovers (p = 0.002), ebooks and hardcovers (p < 0.0001), and ebooks and paperbacks (p = 0.0002). For publication year there is a significant difference between ebooks and paperbacks (p < 0.0001) and hardcovers and paperbacks (p < 0.0001). Since 16 tests were performed, the probability of having at least one type I error is 0.56 and the significance level was adjusted (bonferroni α = .05/16 = 0.0031).
+
+##Randomization Test
+```{R}
+nocurrentread <- goodreads %>% filter(shelf != "currently-reading")
+
+nocurrentread %>% group_by(shelf) %>% summarize(means = mean(pages)) %>% summarize(meandiff = diff(means))
+
+randomdist <- vector()
+for(i in 1:5000){
+  new <- data.frame(shelf = nocurrentread$shelf, pages = sample(nocurrentread$pages))
+  randomdist[i] <- mean(new[new$shelf=="to-read",]$pages)-mean(new[new$shelf=="read",]$pages)}
+
+mean(randomdist>10.175 | randomdist < -10.175)
+
+{hist(randomdist, main="", ylab = ""); abline(v = c(10.175, -10.175), col = "red")}
+```
+For my randomization test, I measured whether there is a difference between the number of pages in the books I have read versus the books I want to read. The null hypothesis is that the mean page number for read and to-read books is the same. The alternative hypothesis is that the mean page number for read and to-read books is different. After conducting a randomized t test, we fail to reject the null hypothesis and conclude that there is not a significant difference in mean page number between read books and to-read books.
+
+##Linear Regression
+```{R}
+readbooks <- goodreads %>% filter(shelf == "read") %>% mutate(avgrate_cat = ifelse(avgrating>mean(avgrating), "good", "bad"))
+readbooks$pages_c <- readbooks$pages - mean(readbooks$pages)
+
+fit <- (lm(myrating ~ pages_c*avgrate_cat, data = readbooks))
+summary(fit)
+
+ggplot(readbooks, aes(x=pages_c, y=myrating, group=avgrate_cat))+
+  geom_point(aes(color=avgrate_cat))+
+  geom_smooth(method = "lm", formula=y~1, se=F, fullrange=T, aes(color = avgrate_cat))
+
+resids <- fit$residuals
+fitvals <- fit$fitted.values
+ggplot() + geom_point(aes(fitvals, resids)) + 
+  geom_hline(yintercept = 0, color='red')
+ks.test(resids, "pnorm", mean = 0, sd(resids))
+
+coeftest(fit, vcov = vcovHC(fit))
+```
+For my linear regression, I created a new variable that characterizes books as "good" or "bad" based on the average community rating. Books with community ratings above the mean are "good" and books with community ratings below the mean are "bad".
+
+The prediction for my rating of a bad book with a mean number of pages is 3.305 stars. For every one page increase in page length, my predicted rating for bad books increases by 0.002 stars. For books with an average number of pages, my rating for good books is 0.671 times greater than my rating for bad books. The slope of page number on my rating for good books is 0.0009 greater than my rating for bad books.
+
+My data fails the assumption of linearity and homoscedasticity, but meets the assumption of normality.
+
+After the robust standard error was applied to the model, an increase is seen in standard error for each coefficient estimate. However, mean centered page number and category remain a significant predictor of my rating.
+
+The model explains 24.4% of the variation in my rating.
+
+##Linear Regression with Bootstrapped Standard Errors
+```{R}
+boot_sample <- replicate(5000, {
+  boot_data <- sample_frac(readbooks, replace = T)
+  boot_fit <- lm(myrating ~ pages_c*avgrate_cat, data = boot_data)
+  coef(boot_fit)
+})
+
+boot_sample %>% t %>% as.data.frame %>% summarize_all(sd)
+```
+After computing bootstrapped standard errors by resampling observations, some differences are seen between original, robust, and bootstrapped standard error. Compared to the original standard error, the bootstrapped standard error for the intercept and a good community rating is larger, while the bootstrapped standard error for page number and the interaction between page number and a good rating is smaller. Compared to the robust standard error, the bootstrapped standard error for the intercept, page number, and interaction between page number and good community rating is smaller, while the bootstrapped standard error for good rating is slightly larger. 
+
+Overall, the standard errors are pretty similar and likely reflect similar p values and levels of significance.
+
+##Logistic Regression
+```{R}
+goodreads <- goodreads %>% mutate(y = ifelse(shelf=="read", 1, 0))
+
+logfit <- glm(y~avgrating+pubyear, data = goodreads, family = "binomial")
+coeftest(logfit)
+exp(coef(logfit))
+
+goodreads$prob <- predict(logfit, type = "response")
+goodreads$truth <- as.factor(goodreads$y)
+
+table(predict = as.numeric(goodreads$prob > .5), truth = goodreads$truth) %>% addmargins
+
+class_diag(goodreads$prob, goodreads$truth)
+
+goodreads$logit <- predict(logfit, type = "link")
+
+ggplot(goodreads, aes(logit, color = truth, fill = truth)) +
+  geom_density(alpha = .5) +
+  geom_vline(xintercept = 0)
+
+roc <- ggplot(goodreads) + geom_roc(aes(d=y, m=prob), n.cuts = 0)
+roc
+calc_auc(roc)
+```
+The intercept shows that the odds of me having read a book when average community rating and publication year are equal to 0 is 0.001. Controlling for publication year, for every one unit increase in average community rating, the odds of me having read a book increase by a factor of 3.75 (p < 0.001). Controlling for average community rating, for every one unit increase in publication year, the odds of me having read a book increase by 1.00.
+
+The model's accuracy shows that it correctly classifies books 61.52% of the time. The sensitivity is 0.939, representing the probability of predicting a book being read if I have actually read it. The specificity is 0.070, representing the probability of predicting a book is listed as to-read or currently reading for books I have not read. The precision is 0.629, the proportion of books classified as read that actually are. The AUC is 0.605, showing the model is a poor predictor of whether or not I have read a book.
+
+##Logistic regression with all variables
+```{R}
+goodreads_l <- goodreads %>% select(-title, -prob, -truth, -logit, -shelf, -myrating)
+
+logfit2 <- glm(y~(.)^2, data = goodreads_l, family = "binomial")
+coef(logfit2)
+
+probs2 <- predict(logfit2, type = "response")
+class_diag(probs2, goodreads_l$y)
+```
+The accuracy of the model, or the proportion of the time it correctly classifies books, is 0.667. The sensitivity is 0.784, showing the probability of predicting a book being read if I have actually read it. The specificity of the model is 0.471, showing it has a low probability of correctly predicting a book as unread when I have not read it. The precision is 0.714, which is the proportion of books classified as read that actually are. The AUC improved to 0.735, showing the model is a fair predictor of whether or not I have read a book.
+```{R}
+set.seed(1234)
+k=10
+
+data <- goodreads_l[sample(nrow(goodreads_l)),]
+folds <- cut(seq(1:nrow(goodreads_l)), breaks = k, labels = F)
+
+diags <- NULL
+for(i in 1:k){
+  train <- data[folds != i,]
+  test <- data[folds == i,]
+  truth <- test$y
+  fit <- glm(y~(.)^2, data = train, family = "binomial")
+  probs <- predict(fit, newdata = test, type = "response")
+  diags <- rbind(diags, class_diag(probs, truth))
+}
+
+summarize_all(diags, mean)
+```
+The AUC dropped to 0.581 in the out of sample analysis, making it a bad model of classification. This is worse than the in sample analysis which had an AUC of 0.735.
+```{R}
+y <- as.matrix(goodreads_l$y)
+x <- model.matrix(y~(.)^2, data = goodreads_l)[,-1]
+
+cv <- cv.glmnet(x,y,family="binomial")
+lasso <- glmnet(x,y,family = "binomial", lambda = cv$lambda.1se)
+coef(lasso)
+
+goodreads_l <- goodreads_l %>% mutate(paperback = ifelse(goodreads_l$binding == "Paperback", 1, 0))
+goodreads_l <- goodreads_l %>% mutate(ebook = ifelse(goodreads_l$binding == "ebook", 1, 0))
+goodreads_l <- goodreads_l %>% mutate(hardcover = ifelse(goodreads_l$binding == "Hardcover", 1, 0))
+
+set.seed(1234)
+k=10
+
+data <- goodreads_l %>% sample_frac
+folds <- ntile(1:nrow(data), n = 10)
+
+diags <- NULL
+for(i in 1:k){
+  train <- data[folds != i,]
+  test <- data[folds == i,]
+  truth <- test$y
+  fit <- glm(y~avgrating+paperback+avgrating:pubyear+ebook:pages+hardcover:pubyear+ebook:pubyear, data = train, family = "binomial")
+  probs <- predict(fit, newdata = test, type = "response")
+  diags <- rbind(diags, class_diag(probs, truth))
+}
+
+summarize_all(diags, mean)
+```
+The variables retained by lasso tend to fluctuate, but those most frequently retained are average community rating, paperback binding, the interaction between average community rating and publication year, the interaction between ebook binding and number of pages, the interaction between ebook binding and publication year, and the interaction between hardcover binding and publication year.
+
+The AUC of the 10 fold CV using the lasso variables is 0.689, so it is a poor model. This AUC is worse than the AUC using all variables (0.735), but better than the AUC for the 10 fold CV using all variables (0.581).

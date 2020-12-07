@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="author" content="Sarah" />
+    
+    <link rel="shortcut icon" type="image/x-icon" href="../../img/favicon.ico">
+    <title>Wrangling and Exploratory Data Analysis</title>
+    <meta name="generator" content="Hugo 0.79.0" />
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <link rel="stylesheet" type="text/css" href="../../css/main.css" />
+    <link rel="stylesheet" type="text/css" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" />
+    <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:200,400,200bold,400old" />
+    
+    <!--[if lt IE 9]>
+			<script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+			<script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+		<![endif]-->
+
+    
+  </head>
+
+  <body>
+    <div id="wrap">
+      
+      <nav class="navbar navbar-default">
+  <div class="container">
+    <div class="navbar-header">
+      <a class="navbar-brand" href="../../"><i class="fa fa-home"></i></a>
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+    </div>
+    <div class="navbar-collapse collapse" id="navbar">
+      <ul class="nav navbar-nav navbar-right">
+      
+        
+        <li><a href="../../post/">BLOG</a></li>
+        
+        <li><a href="../../projects/">PROJECTS</a></li>
+        
+        <li><a href="../../resume/">RESUME</a></li>
+        
+      
+      </ul>
+    </div>
+  </div>
+</nav>
+
+      <div class="container">
+        <div class="blog-post">
+          <h3>
+            <strong><a href="../../project/project1/">Wrangling and Exploratory Data Analysis</a></strong>
+          </h3>
+        </div>
+ 
+<div class="blog-title">
+          <h4>
+         December 7, 2020 
+            &nbsp;&nbsp;
+            
+          </h4>
+        </div>
+
+        <div class="panel panel-default">
+          <div class="panel-body">
+            <div class="blogpost">
+              
+
+
+<div id="introduction" class="section level2">
+<h2>Introduction</h2>
+<p>The dataset &quot;iucn&quot; was obtained from the IUCN website and includes information on the number of threatened species by country. Each row has a variable for the country name and variables for the number of threatened mammals, birds, reptiles, amphibians, fishes, molluscs, other invertebrates, plants, fungi, and chemists. In addition, each row has a variable with the total number of threatened species for the country.</p>
+<p>The dataset &quot;gdp&quot; gives GDP figures by country published by the World Bank for 2017. The information was obtained from worldmeters.info. The dataset includes variables for Country, nominal GDP, abbreviated GDP, GDP growth, population size, GDP per capita, and share of World GDP. Additionally, the dataset &quot;continents&quot; has variables for a country and the continent on which it is located. This dataset came from Wikipedia.</p>
+<p>I am interested in biological conservation, so by combining these datasets, I hope to visualize whether there are any trends between a countries economic status and the number of threatened species within that country. I have also added the continent location to see if there are any trends between location and number of threatened species. I expect countries with higher GDPs will have more threatened species because they are more industrialized, leading to more habitat destruction.</p>
+<pre class="r"><code>library(tidyverse)
+iucn &lt;- read.csv(&quot;thrspecies.csv&quot;)
+gdp &lt;- read.csv(&quot;goodcountriesgdp.csv&quot;)
+continents &lt;- read.csv(&quot;continents.csv&quot;)</code></pre>
+</div>
+<div id="joining-merging" class="section level2">
+<h2>Joining/ Merging</h2>
+<p>I chose to inner join the datasets &quot;gdp&quot; and &quot;iucn&quot; because I will need to have variables from each dataset to visualize the trends between GDP and number of threatened species for a country. Therefore, dropping the rows without matches in both data sets makes the most sense. Similarly, I chose to left join the &quot;continents&quot; dataset to the combined set of &quot;gdp&quot; and &quot;iucn&quot; because I wanted to preserve all gdp/iucn data while introducing the continents as an additional variable.</p>
+<p>By inner joining, I lost 76 rows from the &quot;iucn&quot; dataset and 16 rows from the &quot;gdp&quot; dataset. By left joining, I lost 20 rows from the &quot;continents&quot; dataset. This is important to keep in mind as it means that any trends seen are representative of the countries with matches and not all the countries in the world.</p>
+<pre class="r"><code>joined &lt;- inner_join(iucn, gdp, by = c(Name = &quot;Country&quot;))
+
+joined &lt;- joined %&gt;% left_join(continents, by = c(Name = &quot;country&quot;))</code></pre>
+</div>
+<div id="tidying-restructuring-data" class="section level2">
+<h2>Tidying/ Restructuring Data</h2>
+<pre class="r"><code>joined &lt;- joined %&gt;% rename(Country = Name, Nom_GDP = GDP, GDP_growth = GDP.2, 
+    Per_Capita = GDP.3, Reptiles = Reptiles., Fishes = Fishes., 
+    Molluscs = Molluscs., Other_Inverts = Other.Inverts., Plants = Plants., 
+    Fungi = Fungi., Chromists = Chromists., Share = Share.of) %&gt;% 
+    select(-X., -GDP.1)
+
+joined &lt;- joined %&gt;% separate(GDP_growth, into = c(&quot;GDP_growth&quot;, 
+    &quot;p&quot;), sep = &quot;%&quot;, convert = T) %&gt;% separate(Share, into = c(&quot;Share&quot;, 
+    &quot;d&quot;), sep = &quot;%&quot;, convert = T) %&gt;% select(-p, -d)
+
+joined &lt;- joined %&gt;% separate(Nom_GDP, into = c(&quot;Nom_GDP&quot;, &quot;z&quot;), 
+    convert = T) %&gt;% separate(Per_Capita, into = c(&quot;Per_Capita&quot;, 
+    &quot;zz&quot;), convert = T) %&gt;% select(-z, -zz, -Total) %&gt;% mutate(Total = (Mammals + 
+    Birds + Reptiles + Amphibians + Fishes + Molluscs + Other_Inverts + 
+    Fungi + Chromists))
+
+glimpse(joined)</code></pre>
+<pre><code>## Rows: 174
+## Columns: 18
+## $ Country       &lt;fct&gt; Antigua and Barbuda, Aruba, Bahamas, Barbados, Cuba, Do…
+## $ Mammals       &lt;int&gt; 2, 2, 5, 3, 10, 3, 7, 3, 4, 7, 2, 2, 77, 5, 30, 0, 11, …
+## $ Birds         &lt;int&gt; 2, 2, 8, 3, 20, 6, 17, 2, 17, 10, 7, 5, 96, 21, 51, 4, …
+## $ Reptiles      &lt;int&gt; 7, 2, 11, 7, 29, 3, 47, 7, 54, 28, 8, 7, 47, 7, 25, 1, …
+## $ Amphibians    &lt;int&gt; 0, 0, 0, 0, 49, 2, 32, 1, 49, 15, 0, 8, 122, 5, 20, 0, …
+## $ Fishes        &lt;int&gt; 36, 32, 47, 35, 49, 37, 33, 34, 37, 34, 34, 43, 148, 27…
+## $ Molluscs      &lt;int&gt; 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 1, 38, 0, 0, 52…
+## $ Other_Inverts &lt;int&gt; 11, 1, 11, 11, 23, 11, 19, 10, 14, 15, 11, 10, 70, 8, 1…
+## $ Plants        &lt;fct&gt; 3, 5, 12, 4, 179, 12, 48, 4, 94, 214, 8, 50, 631, 11, 5…
+## $ Fungi         &lt;int&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 12, 0, 4, 0, …
+## $ Chromists     &lt;int&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0…
+## $ Nom_GDP       &lt;dbl&gt; 1.510085e+09, 2.700559e+09, 1.216210e+10, 4.673500e+09,…
+## $ GDP_growth    &lt;dbl&gt; 3.03, 1.33, 1.44, 1.00, 1.78, -9.53, 4.55, 5.06, 1.17, …
+## $ Population    &lt;dbl&gt; 95426, 105366, 381755, 286232, 11339254, 71458, 1051310…
+## $ Per_Capita    &lt;int&gt; 15825, 25630, 31858, 16328, 8541, 6951, 7223, 10164, 76…
+## $ Share         &lt;dbl&gt; 0.00, 0.00, 0.02, 0.01, 0.12, 0.00, 0.09, 0.00, 0.01, 0…
+## $ continent     &lt;fct&gt; North America, NA, North America, North America, North …
+## $ Total         &lt;int&gt; 58, 40, 83, 59, 180, 62, 155, 57, 175, 109, 62, 75, 583…</code></pre>
+<p>Above I used the rename function to fix some column title formatting and make them more informative. I also removed columns I did not need. Additionally, I used separate to remove the percentage sign from the GDP_growth and Share variables and changed them into numeric values. Lastly, I removed the &quot;.00&quot; from the ends of Nom_GDP and Per_Capita to make them easier to read and I created a new Total column so it is classified as numeric.</p>
+<pre class="r"><code>joined %&gt;% pivot_wider(names_from = &quot;continent&quot;, values_from = &quot;Country&quot;) %&gt;% 
+    glimpse()</code></pre>
+<pre><code>## Rows: 174
+## Columns: 23
+## $ Mammals         &lt;int&gt; 2, 2, 5, 3, 10, 3, 7, 3, 4, 7, 2, 2, 77, 5, 30, 0, 11…
+## $ Birds           &lt;int&gt; 2, 2, 8, 3, 20, 6, 17, 2, 17, 10, 7, 5, 96, 21, 51, 4…
+## $ Reptiles        &lt;int&gt; 7, 2, 11, 7, 29, 3, 47, 7, 54, 28, 8, 7, 47, 7, 25, 1…
+## $ Amphibians      &lt;int&gt; 0, 0, 0, 0, 49, 2, 32, 1, 49, 15, 0, 8, 122, 5, 20, 0…
+## $ Fishes          &lt;int&gt; 36, 32, 47, 35, 49, 37, 33, 34, 37, 34, 34, 43, 148, …
+## $ Molluscs        &lt;int&gt; 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 1, 38, 0, 0, …
+## $ Other_Inverts   &lt;int&gt; 11, 1, 11, 11, 23, 11, 19, 10, 14, 15, 11, 10, 70, 8,…
+## $ Plants          &lt;fct&gt; 3, 5, 12, 4, 179, 12, 48, 4, 94, 214, 8, 50, 631, 11,…
+## $ Fungi           &lt;int&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 12, 0, 4, 0…
+## $ Chromists       &lt;int&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,…
+## $ Nom_GDP         &lt;dbl&gt; 1.510085e+09, 2.700559e+09, 1.216210e+10, 4.673500e+0…
+## $ GDP_growth      &lt;dbl&gt; 3.03, 1.33, 1.44, 1.00, 1.78, -9.53, 4.55, 5.06, 1.17…
+## $ Population      &lt;dbl&gt; 95426, 105366, 381755, 286232, 11339254, 71458, 10513…
+## $ Per_Capita      &lt;int&gt; 15825, 25630, 31858, 16328, 8541, 6951, 7223, 10164, …
+## $ Share           &lt;dbl&gt; 0.00, 0.00, 0.02, 0.01, 0.12, 0.00, 0.09, 0.00, 0.01,…
+## $ Total           &lt;int&gt; 58, 40, 83, 59, 180, 62, 155, 57, 175, 109, 62, 75, 5…
+## $ `North America` &lt;fct&gt; Antigua and Barbuda, NA, Bahamas, Barbados, Cuba, Dom…
+## $ `NA`            &lt;fct&gt; NA, Aruba, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA…
+## $ Asia            &lt;fct&gt; NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, China…
+## $ Europe          &lt;fct&gt; NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, N…
+## $ Africa          &lt;fct&gt; NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, N…
+## $ Oceania         &lt;fct&gt; NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, N…
+## $ `South America` &lt;fct&gt; NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, N…</code></pre>
+<p>For the most part, my data was already tidy. There were some alterations I made using separate and rename in the section above, but the columns themselves did not warrant any pivoting. By pivoting wider, I changed the dataset so that each continent is a variable where the cell values are the continent's countries. This created a lot of NA's in my data and I will not be using it in my later wrangling/ visualization.</p>
+</div>
+<div id="wrangling" class="section level2">
+<h2>Wrangling</h2>
+<pre class="r"><code>joined %&gt;% summarise(med = median(Nom_GDP))</code></pre>
+<pre><code>##           med
+## 1 35177734240</code></pre>
+<pre class="r"><code>joined &lt;- joined %&gt;% mutate(NGDPC = case_when(Nom_GDP &gt; 35177734240 ~ 
+    &quot;high&quot;, Nom_GDP &lt;= 35177734240 ~ &quot;low&quot;))
+
+joined &lt;- joined %&gt;% mutate(threat_per_dol = Total/Nom_GDP)
+
+glimpse(joined)</code></pre>
+<pre><code>## Rows: 174
+## Columns: 20
+## $ Country        &lt;fct&gt; Antigua and Barbuda, Aruba, Bahamas, Barbados, Cuba, D…
+## $ Mammals        &lt;int&gt; 2, 2, 5, 3, 10, 3, 7, 3, 4, 7, 2, 2, 77, 5, 30, 0, 11,…
+## $ Birds          &lt;int&gt; 2, 2, 8, 3, 20, 6, 17, 2, 17, 10, 7, 5, 96, 21, 51, 4,…
+## $ Reptiles       &lt;int&gt; 7, 2, 11, 7, 29, 3, 47, 7, 54, 28, 8, 7, 47, 7, 25, 1,…
+## $ Amphibians     &lt;int&gt; 0, 0, 0, 0, 49, 2, 32, 1, 49, 15, 0, 8, 122, 5, 20, 0,…
+## $ Fishes         &lt;int&gt; 36, 32, 47, 35, 49, 37, 33, 34, 37, 34, 34, 43, 148, 2…
+## $ Molluscs       &lt;int&gt; 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 1, 38, 0, 0, 5…
+## $ Other_Inverts  &lt;int&gt; 11, 1, 11, 11, 23, 11, 19, 10, 14, 15, 11, 10, 70, 8, …
+## $ Plants         &lt;fct&gt; 3, 5, 12, 4, 179, 12, 48, 4, 94, 214, 8, 50, 631, 11, …
+## $ Fungi          &lt;int&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 12, 0, 4, 0,…
+## $ Chromists      &lt;int&gt; 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, …
+## $ Nom_GDP        &lt;dbl&gt; 1.510085e+09, 2.700559e+09, 1.216210e+10, 4.673500e+09…
+## $ GDP_growth     &lt;dbl&gt; 3.03, 1.33, 1.44, 1.00, 1.78, -9.53, 4.55, 5.06, 1.17,…
+## $ Population     &lt;dbl&gt; 95426, 105366, 381755, 286232, 11339254, 71458, 105131…
+## $ Per_Capita     &lt;int&gt; 15825, 25630, 31858, 16328, 8541, 6951, 7223, 10164, 7…
+## $ Share          &lt;dbl&gt; 0.00, 0.00, 0.02, 0.01, 0.12, 0.00, 0.09, 0.00, 0.01, …
+## $ continent      &lt;fct&gt; North America, NA, North America, North America, North…
+## $ Total          &lt;int&gt; 58, 40, 83, 59, 180, 62, 155, 57, 175, 109, 62, 75, 58…
+## $ NGDPC          &lt;chr&gt; &quot;low&quot;, &quot;low&quot;, &quot;low&quot;, &quot;low&quot;, &quot;high&quot;, &quot;low&quot;, &quot;high&quot;, &quot;lo…
+## $ threat_per_dol &lt;dbl&gt; 3.840844e-08, 1.481175e-08, 6.824479e-09, 1.262437e-08…</code></pre>
+<pre class="r"><code>joined %&gt;% filter(NGDPC == &quot;high&quot;) %&gt;% summarize(mean(Total), 
+    sd(Total))</code></pre>
+<pre><code>##   mean(Total) sd(Total)
+## 1     238.092  242.4311</code></pre>
+<pre class="r"><code>joined %&gt;% filter(NGDPC == &quot;low&quot;) %&gt;% summarize(mean(Total), 
+    sd(Total))</code></pre>
+<pre><code>##   mean(Total) sd(Total)
+## 1    106.8506  101.4381</code></pre>
+<p>To start wrangling my data, I found the median of the nominal GDP ($35177734240) to create a categorical variable that tells whether a countries nominal GDP is above the mean (high) or below the mean (low). Following this, I created an additional column, threat_per_dol, which is a function of the number of threatened species per nominal GDP dollar. To quantify high and low nominal GDP, I filtered the NGDPC variable to select for &quot;high&quot; or &quot;low&quot; nominal GDP. I then summarized the mean and standard deviation of each group. The countries with high nominal GDPs are characterized by a mean of 238.092 species and a standard deviation of 242.431 species. The countries with low nominal GDPs are characterized by a mean of 106.851 species and standard deviation of 101.438 species. This shows that countries categorized as having high GDP have more threatened species and more variation in the number of threatened species than countries categorized as having low GDP.</p>
+<pre class="r"><code>skinnydata &lt;- joined %&gt;% select(Country, continent, Total, Nom_GDP, 
+    NGDPC)
+
+skinnydata %&gt;% summarise(fivenum = fivenum(Total))</code></pre>
+<pre><code>##   fivenum
+## 1     3.0
+## 2    62.0
+## 3   101.5
+## 4   183.0
+## 5  1129.0</code></pre>
+<pre class="r"><code>skinnydata %&gt;% arrange(Total) %&gt;% slice(1:3, 172:174)</code></pre>
+<pre><code>##         Country     continent Total      Nom_GDP NGDPC
+## 1    San Marino        Europe     3 1.632860e+09   low
+## 2    Luxembourg        Europe    13 6.231636e+10  high
+## 3       Andorra        Europe    14 3.012914e+09   low
+## 4     Australia       Oceania  1003 1.323421e+12  high
+## 5     Indonesia          Asia  1069 1.015421e+12  high
+## 6 United States North America  1129 1.948539e+13  high</code></pre>
+<pre class="r"><code>skinnydata %&gt;% group_by(continent, NGDPC) %&gt;% summarise(mean_t = mean(Total), 
+    sd_t = sd(Total)) %&gt;% na.omit() %&gt;% arrange(mean_t)</code></pre>
+<pre><code>## # A tibble: 12 x 4
+## # Groups:   continent [6]
+##    continent     NGDPC mean_t  sd_t
+##    &lt;fct&gt;         &lt;chr&gt;  &lt;dbl&gt; &lt;dbl&gt;
+##  1 Europe        low     56.3  38.6
+##  2 South America low     74.5  21.9
+##  3 Asia          low     86.8  70.7
+##  4 North America low     94.8  48.2
+##  5 Africa        low    132.  142. 
+##  6 Europe        high   143.  122. 
+##  7 Oceania       low    167.   90.8
+##  8 Africa        high   175.  103. 
+##  9 Asia          high   277.  275. 
+## 10 South America high   337.  234. 
+## 11 North America high   400.  383. 
+## 12 Oceania       high   622.  538.</code></pre>
+<pre class="r"><code>skinnydata %&gt;% group_by(continent) %&gt;% select(where(is.numeric)) %&gt;% 
+    summarise_all(min) %&gt;% na.omit()</code></pre>
+<pre><code>## # A tibble: 6 x 3
+##   continent     Total    Nom_GDP
+##   &lt;fct&gt;         &lt;int&gt;      &lt;dbl&gt;
+## 1 Africa           16 1068124330
+## 2 Asia             30 2528007911
+## 3 Europe            3 1632860041
+## 4 North America    57  496727000
+## 5 Oceania          90   39731317
+## 6 South America    49 2995827901</code></pre>
+<pre class="r"><code>skinnydata %&gt;% group_by(continent) %&gt;% select(where(is.numeric)) %&gt;% 
+    summarise_all(max) %&gt;% na.omit()</code></pre>
+<pre><code>## # A tibble: 6 x 3
+##   continent     Total Nom_GDP
+##   &lt;fct&gt;         &lt;int&gt;   &lt;dbl&gt;
+## 1 Africa          767 3.76e11
+## 2 Asia           1069 1.22e13
+## 3 Europe          475 3.69e12
+## 4 North America  1129 1.95e13
+## 5 Oceania        1003 1.32e12
+## 6 South America   688 2.05e12</code></pre>
+<p>I then make the dataset &quot;skinnydata&quot; from the joined data to select and set the columns I am most interested in. The five number summary of the total threatened species informs that the minimum number of threatened species in a country is 3, the maximum is 1129, the first quartile is 62 species, the third quartile is 183 species, and the median is 101.5 species. By arranging the data by total threatened species then taking a slice of the first and last rows, we learn that two of the three countries with the least threatened species are categorized as having &quot;low&quot; nominal GDP. In contrast, all three countries with the highest number of threatened species are categorized as having &quot;high&quot; nominal GDP. This reflects the findings above that countries with high nominal GDP have more threatened species than countries with lower nominal GDP. Similarly, when grouping by continent and nominal GDP type, we find that on average European countries with low nominal GDP have less threatened species and countries in Oceania with high nominal GDP have the most threatened species. However, we also see that countries with high nominal GDP have higher standard deviations for total threatened species, suggesting a large amount of spread in the data. Lastly, we look at the minimum and maximum values for nominal GDP and total threatened species for each continent. We see that Europe has the country with the least threatened species, while Oceania has the country with the lowest nominal GDP. We also see that North America has the country with the most threatened species and the highest nominal GDP.</p>
+</div>
+<div id="correlation" class="section level2">
+<h2>Correlation</h2>
+<pre class="r"><code>joined %&gt;% select_if(is.numeric) %&gt;% cor(use = &quot;pair&quot;)</code></pre>
+<pre><code>##                    Mammals       Birds    Reptiles   Amphibians      Fishes
+## Mammals         1.00000000  0.79586632  0.69378041  0.541323419  0.75399809
+## Birds           0.79586632  1.00000000  0.58225800  0.594405332  0.64512509
+## Reptiles        0.69378041  0.58225800  1.00000000  0.733148133  0.64723540
+## Amphibians      0.54132342  0.59440533  0.73314813  1.000000000  0.54189269
+## Fishes          0.75399809  0.64512509  0.64723540  0.541892687  1.00000000
+## Molluscs        0.17970101  0.22686805  0.25436255  0.097560694  0.45673488
+##                   Molluscs Other_Inverts       Fungi   Chromists     Nom_GDP
+## Mammals         0.17970101    0.54178235 -0.07453488  0.09091427  0.23540862
+## Birds           0.22686805    0.47398848  0.01658004  0.22258177  0.36339414
+## Reptiles        0.25436255    0.47406877 -0.06669058  0.30647446  0.22532870
+## Amphibians      0.09756069    0.21380795 -0.02796298  0.31837259  0.22127631
+## Fishes          0.45673488    0.63027506  0.06888325  0.03512286  0.47800095
+## Molluscs        1.00000000    0.52794154  0.46872957  0.07356495  0.59909139
+##                  GDP_growth  Population  Per_Capita        Share       Total
+## Mammals         0.100432817  0.45331363 -0.19390723  0.235302915  0.79437216
+## Birds           0.076399877  0.46126945 -0.10586869  0.363401977  0.76212338
+## Reptiles        0.039954185  0.30889346 -0.11418729  0.225281790  0.75806509
+## Amphibians     -0.006815229  0.30262207 -0.09903174  0.221228620  0.62675751
+## Fishes          0.036207275  0.50113425 -0.04346794  0.478027527  0.88600910
+## Molluscs       -0.047961561  0.11200965  0.22449292  0.599103766  0.59411239
+##                threat_per_dol
+## Mammals           -0.08984720
+## Birds             -0.11191724
+## Reptiles          -0.05866019
+## Amphibians        -0.05268822
+## Fishes            -0.08679601
+## Molluscs          -0.03369301
+##  [ reached getOption(&quot;max.print&quot;) -- omitted 10 rows ]</code></pre>
+<pre class="r"><code>joined %&gt;% select_if(is.numeric) %&gt;% cor(use = &quot;pair&quot;) %&gt;% as.data.frame %&gt;% 
+    rownames_to_column %&gt;% pivot_longer(-1) %&gt;% ggplot(aes(rowname, 
+    name, fill = value)) + geom_tile() + geom_text(aes(label = round(value, 
+    1))) + xlab(&quot;&quot;) + ylab(&quot;&quot;) + coord_fixed() + scale_fill_gradient2(low = &quot;red&quot;, 
+    high = &quot;purple&quot;) + theme(axis.text.x = element_text(angle = 45, 
+    hjust = 1))</code></pre>
+<p><img src="../../project/project1_files/figure-html/unnamed-chunk-7-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p>The correlation heatmap does not show any strong correlations between the data. There is a 0.5 correlation between total threatened species and nominal GDP, 0 correlation between total threatened species and GDP growth, and 0 correlation between total threatened species and GDP per capita. The strongest correlations are seen between the number of species threatened in a specific animal kingdom and the total number of threatened species, which is to be expected since the total number of threatened species is a sum of the other animal kingdoms. Interestingly, the number of threatened fishes and total threatened species has a high correlation of 0.9. Nominal GDP and share of global GDP also have a high correlation of 1, which is not unexpected as the values are directly related.</p>
+</div>
+<div id="visualizing" class="section level2">
+<h2>Visualizing</h2>
+<pre class="r"><code>joined %&gt;% na.omit() %&gt;% ggplot(aes(x = continent, y = Total, 
+    fill = NGDPC)) + geom_bar(stat = &quot;summary&quot;, position = &quot;dodge&quot;) + 
+    geom_errorbar(stat = &quot;summary&quot;, position = &quot;dodge&quot;) + theme_light() + 
+    ggtitle(&quot;Number of Threatened Species by Continent&quot;) + ylab(&quot;Mean Threatened Species&quot;) + 
+    xlab(&quot;Continent&quot;) + scale_y_continuous(breaks = seq(0, 1010, 
+    100)) + scale_fill_manual(name = &quot;Countries Nominal GDP&quot;, 
+    values = c(high = &quot;purple&quot;, low = &quot;sky blue&quot;))</code></pre>
+<p><img src="../../project/project1_files/figure-html/unnamed-chunk-8-1.png" width="672" style="display: block; margin: auto;" /> This chart shows a significant difference between the mean number of threatened species based on nominal GDP grouping within a continent. Countries with high nominal GDPs tend to have a higher mean number of threatened species than countries with low nominal GDPs. This difference is shown on all continents except for Africa.</p>
+<p>The chart also shows that Oceania has the most threatened species, followed by North America and South America. countries with high nominal GDPs on these continents also have large standard error bars, suggesting a large amount of spread in the number of threatened species in these countries. Interestingly, countries with low nominal GDP appear to have little spread in the number of threatened species in comparison.</p>
+<pre class="r"><code>joined %&gt;% na.omit() %&gt;% ggplot(aes(x = Nom_GDP, y = Total, color = continent)) + 
+    geom_point(size = 2, alpha = 0.8) + theme_light() + ggtitle(&quot;Number of Threatened Species by Nominal GDP&quot;) + 
+    ylab(&quot;Total Threatened Species&quot;) + xlab(&quot;Nominal GDP&quot;) + 
+    scale_x_log10() + scale_y_log10() + scale_color_brewer(palette = &quot;Dark2&quot;)</code></pre>
+<p><img src="../../project/project1_files/figure-html/unnamed-chunk-9-1.png" width="672" style="display: block; margin: auto;" /> Since there was an uneven spread of Nominal GDP data, with a few countries having extremely large nominal GDPs, I decided to graph the log values of the data to more easily visualize the data. From this chart, we can see there is no convincing relationship between the total number of threatened species and nominal GDP. However, there is a slight positive relationship between the two variables when Nominal GDP is very high.</p>
+<p>Additionally, this graph shows within a continent, there is a general even spread of countries having high and low nominal GDPs. However, countries in Oceania, North America, and Africa tend to make up the lowest nominal GDPs and countries in Europe and Asia make up most of the highest nominal GDPs.</p>
+</div>
+<div id="dimensionality-reduction" class="section level2">
+<h2>Dimensionality Reduction</h2>
+<pre class="r"><code>library(cluster)
+
+pamdata &lt;- joined %&gt;% select(Nom_GDP, Total, Population)
+
+sil_width &lt;- vector()
+
+for (i in 2:10) {
+    pam_fit &lt;- pam(pamdata, k = i)
+    sil_width[i] &lt;- pam_fit$silinfo$avg.width
+}
+
+ggplot() + geom_line(aes(x = 1:10, y = sil_width)) + scale_x_continuous(name = &quot;k&quot;, 
+    breaks = 1:10)</code></pre>
+<p><img src="../../project/project1_files/figure-html/unnamed-chunk-10-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>pam &lt;- pamdata %&gt;% scale() %&gt;% pam(2)
+
+plot(pam, which = 2)</code></pre>
+<p><img src="../../project/project1_files/figure-html/unnamed-chunk-10-2.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>pam</code></pre>
+<pre><code>## Medoids:
+##       ID     Nom_GDP      Total Population
+## [1,]  48 -0.18468511 -0.4346848 -0.2227878
+## [2,] 109  0.01215102  1.6555550  0.1961461
+## Clustering vector:
+##   [1] 1 1 1 1 1 1 1 1 1 1 1 1 2 1 2 1 1 1 1 1 1 1 1 1 1 1 1 2 1 2 1 1 1 2 1 1 1
+##  [38] 1 1 1 1 1 1 2 1 1 1 1 1 2 1 1 1 1 1 1 1 1 2 1 1 1 1 1 1 1 1 2 1 1 1 1 2 1
+##  [75] 1 1 1 1 1 1 2 1 1 1 1 1 1 2 1 2 2 1 1 2 1 1 1 1 1 2
+##  [ reached getOption(&quot;max.print&quot;) -- omitted 74 entries ]
+## Objective function:
+##     build      swap 
+## 0.6011228 0.5982290 
+## 
+## Available components:
+##  [1] &quot;medoids&quot;    &quot;id.med&quot;     &quot;clustering&quot; &quot;objective&quot;  &quot;isolation&quot; 
+##  [6] &quot;clusinfo&quot;   &quot;silinfo&quot;    &quot;diss&quot;       &quot;call&quot;       &quot;data&quot;</code></pre>
+<p>Based on the plot, I chose to make two clusters to maximize the silhouette width. The average silhouette width is 0.72, showing that it has a strong structure. After running PAM, the data shows that the first cluster is characterized by low nominal GDP, low total threatened species, and low population. The second cluster is characterized by high nominal GDP, high total threatened species, and high population.</p>
+<pre class="r"><code>library(GGally)
+
+pamdata %&gt;% mutate(cluster = as.factor(pam$clustering)) %&gt;% ggpairs(columns = c(&quot;Nom_GDP&quot;, 
+    &quot;Total&quot;, &quot;Population&quot;), aes(color = cluster)) + theme(axis.text.x = element_text(angle = 45, 
+    hjust = 1))</code></pre>
+<p><img src="../../project/project1_files/figure-html/unnamed-chunk-11-1.png" width="672" style="display: block; margin: auto;" /> The plot shows that total threatened species and nominal GDP have a positive correlation of 0.500, suggesting that as nominal GDP increases, the number of threatened species increases as well. Additionally, we see a positive correlation between nominal GDP and population size, suggesting that countries with larger populations tend to have a higher nominal GDP. Lastly, we see a positive correlation between population size and total threatened species, suggesting that as populations grow larger more species become threatened.</p>
+</div>
+
+            
+        <hr>         <div class="related-posts">
+                <h5>Related Posts</h5>
+                
+              </div> 
+            </div>
+          </div>
+
+   <hr>  <div class="disqus">
+  <div id="disqus_thread"></div>
+  <script type="text/javascript">
+
+    (function() {
+      
+      
+      if (window.location.hostname == "localhost")
+        return;
+
+      var disqus_shortname = '';
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+  </script>
+  <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+  <a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+</div> 
+        </div>
+      </div>
+    </div>
+
+    
+    <footer>
+  <div id="footer">
+    <div class="container">
+      <p class="text-muted">&copy; All rights reserved. Powered by <a href="https://gohugo.io/">Hugo</a> and
+      <a href="http://www.github.com/nurlansu/hugo-sustain/">sustain</a> with ♥</p>
+    </div>
+  </div>
+</footer>
+<div class="footer"></div>
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+<script src="../../js/docs.min.js"></script>
+<script src="../../js/main.js"></script>
+
+<script src="../../js/ie10-viewport-bug-workaround.js"></script>
+
+
+    
+  </body>
+</html>

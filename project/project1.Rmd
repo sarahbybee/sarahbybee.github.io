@@ -1,0 +1,163 @@
+---
+title: "Wrangling and Exploratory Data Analysis"
+author: "Sarah Bybee"
+date: "2020-12-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, fig.align = "center", warning = F, message = F,
+tidy=TRUE, tidy.opts=list(width.cutoff=60), R.options=list(max.print=100))
+```
+
+## Introduction
+
+The dataset "iucn" was obtained from the IUCN website and includes information on the number of threatened species by country. Each row has a variable for the country name and variables for the number of threatened mammals, birds, reptiles, amphibians, fishes, molluscs, other invertebrates, plants, fungi, and chemists. In addition, each row has a variable with the total number of threatened species for the country.
+
+The dataset "gdp" gives GDP figures by country published by the World Bank for 2017. The information was obtained from worldmeters.info. The dataset includes variables for Country, nominal GDP, abbreviated GDP, GDP growth, population size, GDP per capita, and share of World GDP. Additionally, the dataset "continents" has variables for a country and the continent on which it is located. This dataset came from Wikipedia.
+
+I am interested in biological conservation, so by combining these datasets, I hope to visualize whether there are any trends between a countries economic status and the number of threatened species within that country. I have also added the continent location to see if there are any trends between location and number of threatened species. I expect countries with higher GDPs will have more threatened species because they are more industrialized, leading to more habitat destruction.
+
+```{r}
+library(tidyverse)
+iucn <- read.csv("thrspecies.csv")
+gdp <- read.csv("goodcountriesgdp.csv")
+continents <- read.csv("continents.csv")
+```
+
+## Joining/ Merging
+
+I chose to inner join the datasets "gdp" and "iucn" because I will need to have variables from each dataset to visualize the trends between GDP and number of threatened species for a country. Therefore, dropping the rows without matches in both data sets makes the most sense. Similarly, I chose to left join the "continents" dataset to the combined set of "gdp" and "iucn" because I wanted to preserve all gdp/iucn data while introducing the continents as an additional variable.
+
+By inner joining, I lost 76 rows from the "iucn" dataset and 16 rows from the "gdp" dataset. By left joining, I lost 20 rows from the "continents" dataset. This is important to keep in mind as it means that any trends seen are representative of the countries with matches and not all the countries in the world.
+
+```{r}
+joined <- inner_join(iucn, gdp, by=c("Name"="Country"))
+
+joined <- joined %>% left_join(continents, by = c("Name" = "country"))
+```
+
+##Tidying/ Restructuring Data
+```{r}
+joined <- joined %>% rename("Country" = Name, "Nom_GDP" = GDP, "GDP_growth" = GDP.2, "Per_Capita" = GDP.3, "Reptiles" = Reptiles., "Fishes" = Fishes., "Molluscs" = Molluscs., "Other_Inverts" = Other.Inverts., "Plants" = Plants., "Fungi" = Fungi., "Chromists" = Chromists., "Share" = Share.of) %>% select(-X., -GDP.1) 
+
+joined <- joined %>% separate(GDP_growth, into = c("GDP_growth", "p"), sep = "%", convert = T) %>% separate(Share, into = c("Share", "d"), sep = "%", convert = T) %>% select(-p, -d)
+
+joined <- joined %>% separate(Nom_GDP, into = c("Nom_GDP", "z"), convert = T) %>% separate(Per_Capita, into = c("Per_Capita", "zz"), convert = T) %>% select(-z, -zz, -Total) %>% mutate(Total = (Mammals + Birds + Reptiles + Amphibians + Fishes + Molluscs + Other_Inverts + Fungi + Chromists))
+
+glimpse(joined)
+```
+Above I used the rename function to fix some column title formatting and make them more informative. I also removed columns I did not need. Additionally, I used separate to remove the percentage sign from the GDP_growth and Share variables and changed them into numeric values. Lastly, I removed the ".00" from the ends of Nom_GDP and Per_Capita to make them easier to read and I created a new Total column so it is classified as numeric.
+
+```{r}
+joined %>% pivot_wider(names_from = "continent", values_from = "Country") %>% glimpse()
+```
+For the most part, my data was already tidy. There were some alterations I made using separate and rename in the section above, but the columns themselves did not warrant any pivoting. By pivoting wider, I changed the dataset so that each continent is a variable where the cell values are the continent's countries. This created a lot of NA's in my data and I will not be using it in my later wrangling/ visualization. 
+
+##Wrangling
+```{r}
+joined %>% summarise(med = median(Nom_GDP))
+
+joined <- joined %>% mutate(NGDPC = case_when(Nom_GDP > 35177734240 ~ "high", Nom_GDP <= 35177734240 ~ "low"))
+  
+joined <- joined %>% mutate(threat_per_dol = Total/Nom_GDP)
+
+glimpse(joined)
+
+joined %>% filter(NGDPC == "high") %>% summarize(mean(Total), sd(Total))
+
+joined %>% filter(NGDPC == "low") %>% summarize(mean(Total), sd(Total))
+```
+
+To start wrangling my data, I found the median of the nominal GDP ($35177734240) to create a categorical variable that tells whether a countries nominal GDP is above the mean (high) or below the mean (low). Following this, I created an additional column, threat_per_dol, which is a function of the number of threatened species per nominal GDP dollar. To quantify high and low nominal GDP, I filtered the NGDPC variable to select for "high" or "low" nominal GDP. I then summarized the mean and standard deviation of each group. The countries with high nominal GDPs are characterized by a mean of 238.092 species and a standard deviation of 242.431 species. The countries with low nominal GDPs are characterized by a mean of 106.851 species and standard deviation of 101.438 species. This shows that countries categorized as having high GDP have more threatened species and more variation in the number of threatened species than countries categorized as having low GDP.
+
+```{r}
+skinnydata <- joined %>% select(Country, continent, Total, Nom_GDP, NGDPC)
+
+skinnydata %>% summarise(fivenum = fivenum(Total))
+
+skinnydata %>% arrange(Total) %>% slice(1:3, 172:174)
+
+skinnydata %>% group_by(continent, NGDPC) %>% summarise(mean_t = mean(Total), sd_t = sd(Total)) %>% na.omit() %>% arrange(mean_t)
+
+skinnydata %>% group_by(continent) %>% select(where(is.numeric)) %>% summarise_all(min) %>% na.omit()
+
+skinnydata %>% group_by(continent) %>% select(where(is.numeric)) %>% summarise_all(max) %>% na.omit()
+```
+
+I then make the dataset "skinnydata" from the joined data to select and set the columns I am most interested in. The five number summary of the total threatened species informs that the minimum number of threatened species in a country is 3, the maximum is 1129, the first quartile is 62 species, the third quartile is 183 species, and the median is 101.5 species. By arranging the data by total threatened species then taking a slice of the first and last rows, we learn that two of the three countries with the least threatened species are categorized as having "low" nominal GDP. In contrast, all three countries with the highest number of threatened species are categorized as having "high" nominal GDP. This reflects the findings above that countries with high nominal GDP have more threatened species than countries with lower nominal GDP. Similarly, when grouping by continent and nominal GDP type, we find that on average European countries with low nominal GDP have less threatened species and countries in Oceania with high nominal GDP have the most threatened species. However, we also see that countries with high nominal GDP have higher standard deviations for total threatened species, suggesting a large amount of spread in the data. Lastly, we look at the minimum and maximum values for nominal GDP and total threatened species for each continent. We see that Europe has the country with the least threatened species, while Oceania has the country with the lowest nominal GDP. We also see that North America has the country with the most threatened species and the highest nominal GDP.
+
+##Correlation
+```{r}
+joined%>%select_if(is.numeric)%>%cor(use="pair")
+
+joined%>%select_if(is.numeric)%>%cor(use="pair")%>%as.data.frame%>%
+rownames_to_column%>%pivot_longer(-1)%>%
+ggplot(aes(rowname,name,fill=value))+geom_tile()+
+geom_text(aes(label=round(value,1)))+
+xlab("")+ylab("")+coord_fixed()+
+scale_fill_gradient2(low="red",high="purple")+
+theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+The correlation heatmap does not show any strong correlations between the data. There is a 0.5 correlation between total threatened species and nominal GDP, 0 correlation between total threatened species and GDP growth, and 0 correlation between total threatened species and GDP per capita. The strongest correlations are seen between the number of species threatened in a specific animal kingdom and the total number of threatened species, which is to be expected since the total number of threatened species is a sum of the other animal kingdoms. Interestingly, the number of threatened fishes and total threatened species has a high correlation of 0.9. Nominal GDP and share of global GDP also have a high correlation of 1, which is not unexpected as the values are directly related.
+
+##Visualizing
+```{r}
+joined %>% na.omit() %>% ggplot(aes(x = continent, y = Total, fill = NGDPC)) +
+  geom_bar(stat = "summary", position = "dodge") +
+  geom_errorbar(stat = "summary", position = "dodge")+
+  theme_light()+
+  ggtitle("Number of Threatened Species by Continent") + 
+  ylab("Mean Threatened Species") + xlab("Continent")+
+  scale_y_continuous(breaks=seq(0,1010,100))+
+  scale_fill_manual(name = "Countries Nominal GDP", values=c("high"="purple", "low"="sky blue"))
+```
+This chart shows a significant difference between the mean number of threatened species based on nominal GDP grouping within a continent. Countries with high nominal GDPs tend to have a higher mean number of threatened species than countries with low nominal GDPs. This difference is shown on all continents except for Africa.
+
+The chart also shows that Oceania has the most threatened species, followed by North America and South America. countries with high nominal GDPs on these continents also have large standard error bars, suggesting a large amount of spread in the number of threatened species in these countries. Interestingly, countries with low nominal GDP appear to have little spread in the number of threatened species in comparison.
+
+```{r}
+joined %>% na.omit() %>% ggplot(aes(x = Nom_GDP, y = Total, color = continent)) +
+  geom_point(size=2, alpha = .8) +
+  theme_light()+
+  ggtitle("Number of Threatened Species by Nominal GDP")+
+  ylab("Total Threatened Species") + xlab("Nominal GDP")+
+  scale_x_log10() + scale_y_log10()+
+  scale_color_brewer(palette = "Dark2")
+```
+Since there was an uneven spread of Nominal GDP data, with a few countries having extremely large nominal GDPs, I decided to graph the log values of the data to more easily visualize the data. From this chart, we can see there is no convincing relationship between the total number of threatened species and nominal GDP. However, there is a slight positive relationship between the two variables when Nominal GDP is very high.
+
+Additionally, this graph shows within a continent, there is a general even spread of countries having high and low nominal GDPs. However, countries in Oceania, North America, and Africa tend to make up the lowest nominal GDPs and countries in Europe and Asia make up most of the highest nominal GDPs.
+
+##Dimensionality Reduction
+```{r}
+library(cluster)
+
+pamdata <- joined %>% select(Nom_GDP, Total, Population)
+
+sil_width<-vector()
+
+for(i in 2:10){
+  pam_fit <- pam(pamdata, k = i)
+sil_width[i] <- pam_fit$silinfo$avg.width}
+
+ggplot()+geom_line(aes(x=1:10,y=sil_width))+scale_x_continuous(name="k",breaks=1:10)
+
+pam <- pamdata %>% scale() %>% pam(2)
+
+plot(pam,which=2)
+
+pam
+```
+
+Based on the plot, I chose to make two clusters to maximize the silhouette width. The average silhouette width is 0.72, showing that it has a strong structure. After running PAM, the data shows that the first cluster is characterized by low nominal GDP, low total threatened species, and low population. The second cluster is characterized by high nominal GDP, high total threatened species, and high population.
+
+```{r}
+library(GGally)
+
+pamdata %>% mutate(cluster=as.factor(pam$clustering)) %>%
+ggpairs(columns = c("Nom_GDP","Total","Population"), aes(color=cluster)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+The plot shows that total threatened species and nominal GDP have a positive correlation of 0.500, suggesting that as nominal GDP increases, the number of threatened species increases as well. Additionally, we see a positive correlation between nominal GDP and population size, suggesting that countries with larger populations tend to have a higher nominal GDP. Lastly, we see a positive correlation between population size and total threatened species, suggesting that as populations grow larger more species become threatened.
