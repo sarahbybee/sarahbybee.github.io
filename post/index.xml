@@ -8,13 +8,13 @@
     <language>en-US</language>
     <lastBuildDate>Mon, 07 Dec 2020 00:00:00 +0000</lastBuildDate><atom:link href="/post/index.xml" rel="self" type="application/rss+xml" />
     <item>
-      <title>Python &#43; R Studio</title>
+      <title>R Studio &#43; Python</title>
       <link>/post/2020/12/07/test-post/</link>
       <pubDate>Mon, 07 Dec 2020 00:00:00 +0000</pubDate>
       
       <guid>/post/2020/12/07/test-post/</guid>
-      <description>Switching Coding Languages Do you ever hit a snag when coding and think, &amp;quot;Dang! I know how to do this in Python, but I&#39;ve already started my project in R!&amp;quot; Never fear, there is a quick and easy way to switch between coding languages.
-Reticulate lets R and python talk to each other, so you can convert R objects to Python objects and Python objects back into R objects. It offers the perfect solution for when you want to use a different coding language.</description>
+      <description>Using Reticulate Do you ever hit a snag when coding and think, &amp;quot;Dang! I know how to do this in Python, but I&#39;ve already started my project in R!&amp;quot; Never fear, there is a quick and easy way to switch between coding languages.
+Reticulate lets R and Python talk to each other, so you can convert R objects to Python objects and Python objects back into R objects. It offers the perfect solution for when you want to use a different coding language.</description>
     </item>
     
   </channel>
