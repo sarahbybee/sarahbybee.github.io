@@ -18,14 +18,13 @@ library(readr) goodreadsdata &amp;lt;- read_csv(&amp;quot;goodreadsdata.csv&amp;
     </item>
     
     <item>
-      <title>Test Post</title>
+      <title>Python &#43; R Studio</title>
       <link>/post/2020/12/07/test-post/</link>
       <pubDate>Mon, 07 Dec 2020 00:00:00 +0000</pubDate>
       
       <guid>/post/2020/12/07/test-post/</guid>
-      <description> heading of my post content of my post
-subheading more content
-hist(quakes$mag) quakes &amp;lt;- quakes r.quakes.mag.mean() ## 4.6204000000000001     </description>
+      <description>Switching Coding Languages Do you ever hit a snag when coding and think, &amp;quot;Dang! I know how to do this in Python, but I&#39;ve already started my project in R!&amp;quot; Never fear, there is a quick and easy way to switch between coding languages.
+Reticulate lets R and python talk to each other, so you can convert R objects to Python objects and Python objects back into R objects. It offers the perfect solution for when you want to use a different coding language.</description>
     </item>
     
     <item>
@@ -36,17 +35,6 @@ hist(quakes$mag) quakes &amp;lt;- quakes r.quakes.mag.mean() ## 4.62040000000000
       <guid>/project/project1/</guid>
       <description>Introduction The dataset &amp;quot;iucn&amp;quot; was obtained from the IUCN website and includes information on the number of threatened species by country. Each row has a variable for the country name and variables for the number of threatened mammals, birds, reptiles, amphibians, fishes, molluscs, other invertebrates, plants, fungi, and chemists. In addition, each row has a variable with the total number of threatened species for the country.
 The dataset &amp;quot;gdp&amp;quot; gives GDP figures by country published by the World Bank for 2017.</description>
-    </item>
-    
-    <item>
-      <title>Hello R Markdown</title>
-      <link>/post/2015/07/23/hello-r-markdown/</link>
-      <pubDate>Thu, 23 Jul 2015 21:13:14 -0500</pubDate>
-      
-      <guid>/post/2015/07/23/hello-r-markdown/</guid>
-      <description>R Markdown This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see http://rmarkdown.rstudio.com.
-You can embed an R code chunk like this:
-summary(cars) ## speed dist ## Min. : 4.0 Min. : 2.00 ## 1st Qu.:12.0 1st Qu.: 26.00 ## Median :15.0 Median : 36.00 ## Mean :15.4 Mean : 42.98 ## 3rd Qu.</description>
     </item>
     
     <item>

@@ -1,5 +1,5 @@
 ---
-title: Test Post
+title: Python + R Studio
 author: ''
 date: '2020-12-07'
 slug: test-post
@@ -8,24 +8,33 @@ tags: []
 description: ''
 ---
 
-#heading of my post
+#Switching Coding Languages
 
-content of my post
+Do you ever hit a snag when coding and think, "Dang! I know how to do this in Python, but I've already started my project in R!" Never fear, there is a quick and easy way to switch between coding languages.
 
-##subheading
+Reticulate lets R and python talk to each other, so you can convert R objects to Python objects and Python objects back into R objects. It offers the perfect solution for when you want to use a different coding language.
 
-more content
+As a quick example, let's look at the USArrests dataset built into R.
 
 ```{R}
-hist(quakes$mag)
-quakes <- quakes
+library(reticulate)
+library(tidyverse)
 ```
 
+USArrests has statistics in arrests per 100,000 residents for violent crimes in each US state in 1973. The dataset also contains the percent of the population in urban areas.
+
+```{R}
+glimpse(USArrests)
+usarrests <- USArrests
+```
+
+We can save this data in R and then look at some summary statistics using Python.
 
 ```{python}
-r.quakes.mag.mean()
+r.usarrests.describe()
 ```
-
 <center>
-![](/post/2020-12-07-test-post_files/IMG_8956.PNG){width=80%}
+![](/post/2020-12-07-test-post_files/sideeye.jpg){width=68%}
 </center>
+
+Not exactly the most uplifting results... but it does show that you can switch between R and Python using reticulate whenever you want. 
